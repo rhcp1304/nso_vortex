@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'meeting_insight'
+    'meeting_insight',
+    'nso_meeting_agent'
 ]
 
 MIDDLEWARE = [
