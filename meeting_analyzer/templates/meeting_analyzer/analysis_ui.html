@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Meeting Analysis Agent</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4; }
+        #container { max-width: 650px; margin: 20px auto; background: white; border: 1px solid #ddd; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #007bff; margin-bottom: 25px; }
+        .file-input-group { margin-bottom: 20px; }
+        .file-input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .file-input-group input[type="file"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; padding: 12px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 15px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 30px; padding: 15px; border-radius: 5px; border: 1px solid #ddd; white-space: pre-wrap; min-height: 50px; }
+        .success { border-color: green; background-color: #e6ffe6; color: green; }
+        .error { border-color: red; background-color: #ffe6e6; color: red; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h1>Multimodal Meeting Analysis Agent</h1>
+    <p>
+        Upload the required files to begin the automated analysis workflow.
+    </p>
+
+    {% csrf_token %}
+
+    <div class="file-input-group">
+        <label for="ppt_file">1. Property Presentation (PPT/PPTX)</label>
+        <input type="file" id="ppt_file" name="ppt_file" accept=".pptx,.ppt" required>
+    </div>
+
+    <div class="file-input-group">
+        <label for="video_file">2. Meeting Video (MP4)</label>
+        <input type="file" id="video_file" name="video_file" accept="video/mp4" required>
+    </div>
+
+    <div class="file-input-group">
+        <label for="transcript_file">3. Google Diarized Transcript (TXT/JSON)</label>
+        <input type="file" id="transcript_file" name="transcript_file" accept=".txt,.json" required>
+    </div>
+
+    <button id="startButton" onclick="startAnalysis()">Generate Meeting Analysis</button>
+
+    <div id="status">
+        Waiting for file uploads...
+    </div>
+</div>
+
+<script>
+    function startAnalysis() {
+        const pptFile = document.getElementById('ppt_file').files[0];
+        const videoFile = document.getElementById('video_file').files[0];
+        const transcriptFile = document.getElementById('transcript_file').files[0];
+        const startButton = document.getElementById('startButton');
+        const statusDiv = document.getElementById('status');
+        const apiUrl = "{% url 'start_analysis' %}";
+
+        if (!pptFile || !videoFile || !transcriptFile) {
+            statusDiv.className = 'error';
+            statusDiv.innerHTML = "<h3>🚨 Error: Please select all three required files.</h3>";
+            return;
+        }
+
+        // 1. Prepare FormData object for file upload
+        const formData = new FormData();
+        formData.append('ppt_file', pptFile);
+        formData.append('video_file', videoFile);
+        formData.append('transcript_file', transcriptFile);
+        // Add CSRF token for security
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+
+        // 2. Update UI
+        startButton.disabled = true;
+        startButton.textContent = "Processing... (This may take several minutes)";
+        statusDiv.className = '';
+        statusDiv.innerHTML = 'Uploading files and starting server workflow...';
+
+        // 3. Send the POST request with files
+        fetch(apiUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json().then(data => ({
+            status: response.status,
+            ok: response.ok,
+            body: data
+        })))
+        .then(({ status, ok, body }) => {
+            // 4. Process the response
+            if (ok && body.status === 'success') {
+                statusDiv.className = 'success';
+                statusDiv.innerHTML = `
+                    <h3>✅ Analysis Successful!</h3>
+                    <p>Message: ${body.message}</p>
+                    <p>Report available at: <a href="${body.report_url}" target="_blank">${body.report_url}</a></p>
+                `;
+            } else {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = `
+                    <h3>❌ Analysis Failed (HTTP Status: ${status})</h3>
+                    <p>Error: ${body.error || 'Unknown error occurred.'}</p>
+                    <p>Check the server console for detailed logs.</p>
+                `;
+            }
+        })
+        .catch(error => {
+            // 5. Handle network errors
+            statusDiv.className = 'error';
+            statusDiv.innerHTML = `
+                <h3>🚨 Network Error</h3>
+                <p>Could not connect to the server.</p>
+                <p>Error: ${error.message}</p>
+            `;
+        })
+        .finally(() => {
+            // 6. Re-enable the button
+            startButton.disabled = false;
+            startButton.textContent = "Generate Meeting Analysis";
+        });
+    }
+</script>
+
+</body>
+</html>
